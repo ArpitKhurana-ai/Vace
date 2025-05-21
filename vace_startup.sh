@@ -1,76 +1,79 @@
 #!/bin/bash
 set -xe
 
-# 📒 Log setup
+# 🔁 Clean logs
 rm -rf /app/startup.log
 exec > >(tee /app/startup.log) 2>&1
 
-echo "🚀 Starting VACE AI Video Generation Setup..."
+echo "🟡 Starting VACE AI Video Generator Setup..."
 
-# 🕓 Set timezone
+# 🕓 Timezone setup
+apt-get update && apt-get install -y tzdata
 ln -fs /usr/share/zoneinfo/Asia/Kolkata /etc/localtime &&     dpkg-reconfigure -f noninteractive tzdata
 
-# 📦 Install system dependencies
-apt-get update && apt-get install -y git ffmpeg wget unzip libgl1 python3-pip
-
-# 🔐 Hugging Face login (non-blocking)
+# 🔐 Hugging Face login
 echo "🔐 Authenticating Hugging Face..."
 huggingface-cli login --token "$HF_TOKEN" || true
 
-# 📁 Setup workspace
-cd /workspace || exit 1
-mkdir -p /workspace/model /workspace/output
-chmod -R 777 /workspace
+# 📁 Create persistent model and output directories
+export VACE_MODEL_PATH="/workspace/vace_model"
+export VACE_OUTPUT_PATH="/workspace/output"
+mkdir -p "$VACE_MODEL_PATH" "$VACE_OUTPUT_PATH"
+chmod -R 777 "$VACE_MODEL_PATH" "$VACE_OUTPUT_PATH"
 
-# 🧠 Clone VACE GitHub repo
+cd /workspace || exit 1
+
+# 🧠 Clone VACE repo if missing
 if [ ! -d "/workspace/VACE" ]; then
-  echo "📥 Cloning VACE repository..."
-  git clone https://github.com/ali-vilab/VACE.git /workspace/VACE
+    echo "📥 Cloning VACE GitHub repository..."
+    git clone https://github.com/ali-vilab/VACE.git /workspace/VACE
 else
-  echo "📂 VACE repository already present. Skipping clone."
+    echo "✅ VACE repo already exists, skipping clone."
 fi
 
 cd /workspace/VACE
 
-# 📦 Install Python dependencies
+# 📦 Install dependencies
 pip install --upgrade pip
 pip install -r requirements.txt || true
-pip install huggingface_hub einops omegaconf safetensors av transformers accelerate || true
+pip install huggingface_hub einops omegaconf safetensors av transformers accelerate
 
-# 📥 Download model from Hugging Face using snapshot_download
+# ⬇️ Download VACE model using Hugging Face snapshot_download
 echo "⬇️ Downloading Wan2.1-VACE-14B model..."
 python3 - <<EOF
 import os
 from huggingface_hub import snapshot_download
 
-model_dir = "/workspace/model"
 snapshot_download(
     repo_id="Wan-AI/Wan2.1-VACE-14B",
     repo_type="model",
-    local_dir=model_dir,
+    local_dir=os.environ['VACE_MODEL_PATH'],
     local_dir_use_symlinks=False,
     token=os.environ.get("HF_TOKEN", None)
 )
 EOF
 
-# 🧪 Sanity check for model weights
-echo "🔍 Verifying model files..."
-if [ ! -f "/workspace/model/pytorch_model.bin" ]; then
-  echo "❌ Model download failed or file missing: pytorch_model.bin"
-  ls -lh /workspace/model
-  exit 1
+chmod -R 777 "$VACE_MODEL_PATH"
+
+# 🔍 Check for model file
+echo "🔍 Validating model files..."
+if [ ! -f "$VACE_MODEL_PATH/pytorch_model.bin" ]; then
+    echo "❌ ERROR: pytorch_model.bin not found in $VACE_MODEL_PATH"
+    ls -lh "$VACE_MODEL_PATH"
+    exit 1
+else
+    echo "✅ Found: $VACE_MODEL_PATH/pytorch_model.bin"
 fi
-echo "✅ Model files verified."
 
-# 📽️ Run example inference (edit prompt as needed)
-echo "🎬 Running test video generation..."
+# 🎬 Run test inference
+echo "🎥 Running example video generation..."
 python3 inference.py \
-  --pretrained_model_path /workspace/model \
-  --prompt "a futuristic city with flying cars at sunset" \
-  --output_path /workspace/output \
-  --steps 50
+    --pretrained_model_path "$VACE_MODEL_PATH" \
+    --prompt "a futuristic city with flying cars at sunset" \
+    --output_path "$VACE_OUTPUT_PATH" \
+    --steps 50
 
-# ✅ Install FileBrowser for file access
+# ✅ Install and launch FileBrowser
 cd /workspace
 wget https://github.com/filebrowser/filebrowser/releases/latest/download/linux-amd64-filebrowser.tar.gz -O fb.tar.gz
 tar --no-same-owner -xvzf fb.tar.gz
@@ -86,7 +89,7 @@ filebrowser \
   -d /workspace/filebrowser/filebrowser.db \
   > /workspace/filebrowser.log 2>&1 &
 
-# ✅ Show running services
+# ✅ Show open ports
 ss -tulpn | grep LISTEN || true
 
 # 📄 Tail logs
