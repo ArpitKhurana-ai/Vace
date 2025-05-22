@@ -14,7 +14,7 @@ ln -fs /usr/share/zoneinfo/Asia/Kolkata /etc/localtime && \
 
 # 🔐 Hugging Face Login
 echo "🔐 Authenticating Hugging Face..."
-huggingface-cli login --token \"$HF_TOKEN\" || true
+huggingface-cli login --token "$HF_TOKEN" || true
 
 # 📁 Prepare folders
 export COMFYUI_MODELS_PATH="/workspace/models"
@@ -47,12 +47,10 @@ pip install -r /workspace/VACE/requirements.txt || true
 pip install huggingface_hub einops omegaconf safetensors av transformers accelerate
 
 # ⬇️ Download VACE model
-# ✅ Set model path
 export VACE_MODEL_PATH="/workspace/models/checkpoints/Wan2.1-VACE-14B"
 mkdir -p "$VACE_MODEL_PATH"
 chmod -R 777 "$VACE_MODEL_PATH"
 
-# ✅ Then use it in the Python block
 python3 - <<EOF
 import os
 from huggingface_hub import snapshot_download
@@ -76,8 +74,8 @@ touch ComfyUI-Impact-Pack/__init__.py
 
 # ⬇️ Download example workflow JSON from QuantStack
 echo "⬇️ Fetching example workflow file..."
-wget -O "$COMFYUI_WORKFLOWS_PATH/vace_v2v_example_workflow.json" \\
-    https://huggingface.co/QuantStack/Wan2.1-VACE-14B-GGUF/resolve/main/vace_v2v_example_workflow.json
+wget -O "$COMFYUI_WORKFLOWS_PATH/vace_v2v_example_workflow.json" \
+https://huggingface.co/QuantStack/Wan2.1-VACE-14B-GGUF/resolve/main/vace_v2v_example_workflow.json
 
 # ✅ Sanity check: model file
 echo "🔍 Validating model presence..."
@@ -101,11 +99,11 @@ mv filebrowser /usr/local/bin/filebrowser
 mkdir -p /workspace/filebrowser
 chmod -R 777 /workspace/filebrowser
 
-filebrowser \\
-  -r /workspace \\
-  --address 0.0.0.0 \\
-  -p 8080 \\
-  -d /workspace/filebrowser/filebrowser.db \\
+filebrowser \
+  -r /workspace \
+  --address 0.0.0.0 \
+  -p 8080 \
+  -d /workspace/filebrowser/filebrowser.db \
   > /workspace/filebrowser.log 2>&1 &
 
 # ✅ Show open ports
