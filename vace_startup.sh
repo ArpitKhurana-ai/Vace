@@ -99,10 +99,18 @@ git clone https://github.com/ltdrdata/ComfyUI-Manager.git || true
 git clone https://github.com/ltdrdata/ComfyUI-Impact-Pack.git || true
 touch ComfyUI-Impact-Pack/__init__.py
 
+# 🧯 Optional Delay: Let FS settle
+echo "⏳ Waiting 5 seconds for filesystem to flush..."
+sleep 5
+
 # ⬇️ Download workflow from QuantStack
 echo "⬇️ Fetching QuantStack example workflow file..."
 wget -O "$COMFYUI_WORKFLOWS_PATH/vace_v2v_example_workflow.json" \
 https://huggingface.co/QuantStack/Wan2.1-VACE-14B-GGUF/resolve/main/vace_v2v_example_workflow.json
+
+# 🧯 Final Delay before launching ComfyUI (to avoid reload-crash loop)
+echo "⏳ Final delay before ComfyUI launch..."
+sleep 5
 
 # ✅ Launch ComfyUI
 cd /workspace/ComfyUI
