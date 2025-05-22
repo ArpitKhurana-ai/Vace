@@ -7,8 +7,15 @@ exec > >(tee /app/startup.log) 2>&1
 
 echo "🟡 Starting ComfyUI + VACE Setup..."
 
+# 🌐 Dummy HTTP listener to keep RunPod alive
+nohup python3 -m http.server 8188 > /dev/null 2>&1 &
+sleep 2
+
 # 🕓 Timezone Setup
-apt-get update && apt-get install -y tzdata git ffmpeg wget unzip libgl1 python3-pip
+apt-get update && \
+    apt-get install -y --no-install-recommends \
+    tzdata git ffmpeg wget unzip libgl1 python3-pip htop
+
 ln -fs /usr/share/zoneinfo/Asia/Kolkata /etc/localtime && \
     dpkg-reconfigure -f noninteractive tzdata
 
@@ -49,8 +56,10 @@ touch /workspace/VACE/vace/models/unit/README.txt
 
 # 📦 Python requirements
 pip install --upgrade pip
-pip install -r /workspace/VACE/requirements.txt || true
 pip install huggingface_hub einops omegaconf safetensors av transformers accelerate torchsde aiohttp
+
+# ✅ Optional: Install VACE requirements if not already present
+pip install -r /workspace/VACE/requirements.txt || true
 
 # ⬇️ Download VACE model to wan/
 python3 - <<EOF
@@ -99,8 +108,8 @@ git clone https://github.com/ltdrdata/ComfyUI-Manager.git || true
 git clone https://github.com/ltdrdata/ComfyUI-Impact-Pack.git || true
 touch ComfyUI-Impact-Pack/__init__.py
 
-# 🧯 Optional Delay: Let FS settle
-echo "⏳ Waiting 5 seconds for filesystem to flush..."
+# ⏳ Let filesystem settle
+echo "⏳ Sleeping 5s before workflow fetch..."
 sleep 5
 
 # ⬇️ Download workflow from QuantStack
@@ -108,16 +117,19 @@ echo "⬇️ Fetching QuantStack example workflow file..."
 wget -O "$COMFYUI_WORKFLOWS_PATH/vace_v2v_example_workflow.json" \
 https://huggingface.co/QuantStack/Wan2.1-VACE-14B-GGUF/resolve/main/vace_v2v_example_workflow.json
 
-# 🧯 Final Delay before launching ComfyUI (to avoid reload-crash loop)
-echo "⏳ Final delay before ComfyUI launch..."
+# ⏳ Final delay before launching servers
+echo "⏳ Sleeping 5s before launching ComfyUI and FileBrowser..."
 sleep 5
 
 # ✅ Launch ComfyUI
 cd /workspace/ComfyUI
+echo "🚀 Launching ComfyUI..."
 python3 main.py --listen 0.0.0.0 --port 8188 > /workspace/comfyui.log 2>&1 &
+sleep 5
 
-# ✅ Install FileBrowser
+# ✅ Install and Launch FileBrowser
 cd /workspace
+echo "📁 Launching FileBrowser..."
 wget https://github.com/filebrowser/filebrowser/releases/latest/download/linux-amd64-filebrowser.tar.gz -O fb.tar.gz
 tar --no-same-owner -xvzf fb.tar.gz
 chmod +x filebrowser
@@ -131,10 +143,12 @@ filebrowser \
   -p 8080 \
   -d /workspace/filebrowser/filebrowser.db \
   > /workspace/filebrowser.log 2>&1 &
+sleep 5
 
 # ✅ Show open ports
+echo "🌐 Open ports:"
 ss -tulpn | grep LISTEN || true
 
 # 📄 Tail logs
 echo "📄 Tailing logs..."
-tail -f /workspace/comfyui.log /workspace/filebrowser.log
+tail -n 200 -f /workspace/comfyui.log /workspace/filebrowser.log
