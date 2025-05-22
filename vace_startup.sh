@@ -64,7 +64,20 @@ snapshot_download(
 )
 EOF
 
-# 🔁 Clone custom node pack if needed (can extend here)
+# 🧾 List downloaded model files
+echo "📁 Contents of model directory:"
+ls -lh "$VACE_MODEL_PATH"
+
+# ✅ Flexible sanity check for model
+echo "🔍 Validating model presence..."
+if [ -z "$(ls -A $VACE_MODEL_PATH)" ]; then
+    echo "❌ ERROR: Model folder is empty!"
+    exit 1
+else
+    echo "✅ VACE model files detected."
+fi
+
+# 🔁 Clone custom node pack if needed
 echo "📦 Installing custom nodes..."
 mkdir -p /workspace/ComfyUI/custom_nodes
 cd /workspace/ComfyUI/custom_nodes
@@ -72,19 +85,10 @@ git clone https://github.com/ltdrdata/ComfyUI-Manager.git || true
 git clone https://github.com/ltdrdata/ComfyUI-Impact-Pack.git || true
 touch ComfyUI-Impact-Pack/__init__.py
 
-# ⬇️ Download example workflow JSON from QuantStack
+# ⬇️ Download example workflow JSON
 echo "⬇️ Fetching example workflow file..."
 wget -O "$COMFYUI_WORKFLOWS_PATH/vace_v2v_example_workflow.json" \
 https://huggingface.co/QuantStack/Wan2.1-VACE-14B-GGUF/resolve/main/vace_v2v_example_workflow.json
-
-# ✅ Sanity check: model file
-echo "🔍 Validating model presence..."
-if [ ! -f "/workspace/models/checkpoints/Wan2.1-VACE-14B/pytorch_model.bin" ]; then
-    echo "❌ ERROR: Model not found!"
-    exit 1
-else
-    echo "✅ VACE model ready."
-fi
 
 # ✅ Launch ComfyUI
 cd /workspace/ComfyUI
