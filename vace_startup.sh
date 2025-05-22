@@ -47,7 +47,12 @@ pip install -r /workspace/VACE/requirements.txt || true
 pip install huggingface_hub einops omegaconf safetensors av transformers accelerate
 
 # ⬇️ Download VACE model
-echo "⬇️ Downloading Wan2.1-VACE-14B model..."
+# ✅ Set model path
+export VACE_MODEL_PATH="/workspace/models/checkpoints/Wan2.1-VACE-14B"
+mkdir -p "$VACE_MODEL_PATH"
+chmod -R 777 "$VACE_MODEL_PATH"
+
+# ✅ Then use it in the Python block
 python3 - <<EOF
 import os
 from huggingface_hub import snapshot_download
@@ -55,7 +60,7 @@ from huggingface_hub import snapshot_download
 snapshot_download(
     repo_id="Wan-AI/Wan2.1-VACE-14B",
     repo_type="model",
-    local_dir=os.environ['VACE_MODEL_PATH'],
+    local_dir=os.environ["VACE_MODEL_PATH"],
     local_dir_use_symlinks=False,
     token=os.environ.get("HF_TOKEN", None)
 )
