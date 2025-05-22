@@ -50,7 +50,7 @@ touch /workspace/VACE/vace/models/unit/README.txt
 # 📦 Python requirements
 pip install --upgrade pip
 pip install -r /workspace/VACE/requirements.txt || true
-pip install huggingface_hub einops omegaconf safetensors av transformers accelerate torchsde
+pip install huggingface_hub einops omegaconf safetensors av transformers accelerate torchsde aiohttp
 
 # ⬇️ Download VACE model to wan/
 python3 - <<EOF
