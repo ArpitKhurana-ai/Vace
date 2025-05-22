@@ -5,75 +5,87 @@ set -xe
 rm -rf /app/startup.log
 exec > >(tee /app/startup.log) 2>&1
 
-echo "🟡 Starting VACE AI Video Generator Setup..."
+echo "🟡 Starting ComfyUI + VACE Setup..."
 
-# 🕓 Timezone setup
-apt-get update && apt-get install -y tzdata
-ln -fs /usr/share/zoneinfo/Asia/Kolkata /etc/localtime &&     dpkg-reconfigure -f noninteractive tzdata
+# 🕓 Timezone Setup
+apt-get update && apt-get install -y tzdata git ffmpeg wget unzip libgl1 python3-pip
+ln -fs /usr/share/zoneinfo/Asia/Kolkata /etc/localtime && \
+    dpkg-reconfigure -f noninteractive tzdata
 
-# 🔐 Hugging Face login
+# 🔐 Hugging Face Login
 echo "🔐 Authenticating Hugging Face..."
-huggingface-cli login --token "$HF_TOKEN" || true
+huggingface-cli login --token \"$HF_TOKEN\" || true
 
-# 📁 Create persistent model and output directories
-export VACE_MODEL_PATH="/workspace/vace_model"
-export VACE_OUTPUT_PATH="/workspace/output"
-mkdir -p "$VACE_MODEL_PATH" "$VACE_OUTPUT_PATH"
-chmod -R 777 "$VACE_MODEL_PATH" "$VACE_OUTPUT_PATH"
+# 📁 Prepare folders
+export COMFYUI_MODELS_PATH="/workspace/models"
+export COMFYUI_WORKFLOWS_PATH="/workspace/ComfyUI/workflows"
+mkdir -p "$COMFYUI_MODELS_PATH" "$COMFYUI_WORKFLOWS_PATH"
+chmod -R 777 "$COMFYUI_MODELS_PATH"
 
 cd /workspace || exit 1
 
-# 🧠 Clone VACE repo if missing
-if [ ! -d "/workspace/VACE" ]; then
-    echo "📥 Cloning VACE GitHub repository..."
-    git clone https://github.com/ali-vilab/VACE.git /workspace/VACE
-else
-    echo "✅ VACE repo already exists, skipping clone."
+# 📥 Clone ComfyUI if needed
+if [ ! -f "ComfyUI/main.py" ]; then
+    echo "📦 Cloning ComfyUI..."
+    rm -rf ComfyUI
+    git clone https://github.com/comfyanonymous/ComfyUI.git
 fi
 
-cd /workspace/VACE
+# 🔁 Link models folder
+rm -rf /workspace/ComfyUI/models
+ln -s "$COMFYUI_MODELS_PATH" /workspace/ComfyUI/models
 
-# 📦 Install dependencies
+# 🧠 Clone VACE repo
+if [ ! -d "/workspace/VACE" ]; then
+    echo "📥 Cloning VACE repository..."
+    git clone https://github.com/ali-vilab/VACE.git /workspace/VACE
+fi
+
+# 📦 Python requirements
 pip install --upgrade pip
-pip install -r requirements.txt || true
+pip install -r /workspace/VACE/requirements.txt || true
 pip install huggingface_hub einops omegaconf safetensors av transformers accelerate
 
-# ⬇️ Download VACE model using Hugging Face snapshot_download
+# ⬇️ Download VACE model
 echo "⬇️ Downloading Wan2.1-VACE-14B model..."
 python3 - <<EOF
-import os
 from huggingface_hub import snapshot_download
-
 snapshot_download(
     repo_id="Wan-AI/Wan2.1-VACE-14B",
     repo_type="model",
-    local_dir=os.environ['VACE_MODEL_PATH'],
+    local_dir="/workspace/models/checkpoints/Wan2.1-VACE-14B",
     local_dir_use_symlinks=False,
     token=os.environ.get("HF_TOKEN", None)
 )
 EOF
 
-chmod -R 777 "$VACE_MODEL_PATH"
+# 🔁 Clone custom node pack if needed (can extend here)
+echo "📦 Installing custom nodes..."
+mkdir -p /workspace/ComfyUI/custom_nodes
+cd /workspace/ComfyUI/custom_nodes
+git clone https://github.com/ltdrdata/ComfyUI-Manager.git || true
+git clone https://github.com/ltdrdata/ComfyUI-Impact-Pack.git || true
+touch ComfyUI-Impact-Pack/__init__.py
 
-# 🔍 Check for model file
-echo "🔍 Validating model files..."
-if [ ! -f "$VACE_MODEL_PATH/pytorch_model.bin" ]; then
-    echo "❌ ERROR: pytorch_model.bin not found in $VACE_MODEL_PATH"
-    ls -lh "$VACE_MODEL_PATH"
+# ⬇️ Download example workflow JSON from QuantStack
+echo "⬇️ Fetching example workflow file..."
+wget -O "$COMFYUI_WORKFLOWS_PATH/vace_v2v_example_workflow.json" \\
+    https://huggingface.co/QuantStack/Wan2.1-VACE-14B-GGUF/resolve/main/vace_v2v_example_workflow.json
+
+# ✅ Sanity check: model file
+echo "🔍 Validating model presence..."
+if [ ! -f "/workspace/models/checkpoints/Wan2.1-VACE-14B/pytorch_model.bin" ]; then
+    echo "❌ ERROR: Model not found!"
     exit 1
 else
-    echo "✅ Found: $VACE_MODEL_PATH/pytorch_model.bin"
+    echo "✅ VACE model ready."
 fi
 
-# 🎬 Run test inference
-echo "🎥 Running example video generation..."
-python3 inference.py \
-    --pretrained_model_path "$VACE_MODEL_PATH" \
-    --prompt "a futuristic city with flying cars at sunset" \
-    --output_path "$VACE_OUTPUT_PATH" \
-    --steps 50
+# ✅ Launch ComfyUI
+cd /workspace/ComfyUI
+python3 main.py --listen 0.0.0.0 --port 8188 > /workspace/comfyui.log 2>&1 &
 
-# ✅ Install and launch FileBrowser
+# ✅ Install FileBrowser
 cd /workspace
 wget https://github.com/filebrowser/filebrowser/releases/latest/download/linux-amd64-filebrowser.tar.gz -O fb.tar.gz
 tar --no-same-owner -xvzf fb.tar.gz
@@ -82,11 +94,11 @@ mv filebrowser /usr/local/bin/filebrowser
 mkdir -p /workspace/filebrowser
 chmod -R 777 /workspace/filebrowser
 
-filebrowser \
-  -r /workspace \
-  --address 0.0.0.0 \
-  -p 8080 \
-  -d /workspace/filebrowser/filebrowser.db \
+filebrowser \\
+  -r /workspace \\
+  --address 0.0.0.0 \\
+  -p 8080 \\
+  -d /workspace/filebrowser/filebrowser.db \\
   > /workspace/filebrowser.log 2>&1 &
 
 # ✅ Show open ports
@@ -94,4 +106,4 @@ ss -tulpn | grep LISTEN || true
 
 # 📄 Tail logs
 echo "📄 Tailing logs..."
-tail -f /workspace/filebrowser.log
+tail -f /workspace/comfyui.log /workspace/filebrowser.log
