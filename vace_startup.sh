@@ -91,7 +91,7 @@ fi
 echo "⬇️ Downloading VAE file for Wan2.1..."
 mkdir -p /workspace/models/vae
 wget -O /workspace/models/vae/wan_2.1_vae.safetensors \
-https://huggingface.co/Wan-AI/Wan2.1-VACE-14B/resolve/main/wan_2.1_vae.safetensors
+https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged/resolve/main/split_files/vae/wan_2.1_vae.safetensors
 chmod 777 /workspace/models/vae/wan_2.1_vae.safetensors
 
 # 🔁 Install custom nodes
