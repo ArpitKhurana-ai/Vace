@@ -19,8 +19,10 @@ huggingface-cli login --token "$HF_TOKEN" || true
 # 📁 Prepare folders
 export COMFYUI_MODELS_PATH="/workspace/models"
 export COMFYUI_WORKFLOWS_PATH="/workspace/ComfyUI/workflows"
-mkdir -p "$COMFYUI_MODELS_PATH" "$COMFYUI_WORKFLOWS_PATH"
-chmod -R 777 "$COMFYUI_MODELS_PATH"
+export VACE_MODEL_PATH="/workspace/VACE/vace/models/wan"
+export VACE_CHECKPOINT_PATH="/workspace/models/checkpoints/Wan2.1-VACE-14B"
+mkdir -p "$COMFYUI_MODELS_PATH" "$COMFYUI_WORKFLOWS_PATH" "$VACE_MODEL_PATH" "$VACE_CHECKPOINT_PATH"
+chmod -R 777 "$COMFYUI_MODELS_PATH" "$VACE_MODEL_PATH" "$VACE_CHECKPOINT_PATH"
 
 cd /workspace || exit 1
 
@@ -41,16 +43,16 @@ if [ ! -d "/workspace/VACE" ]; then
     git clone https://github.com/ali-vilab/VACE.git /workspace/VACE
 fi
 
+# 🧱 Create stub for unit folder (required by some VACE nodes)
+mkdir -p /workspace/VACE/vace/models/unit
+touch /workspace/VACE/vace/models/unit/README.txt
+
 # 📦 Python requirements
 pip install --upgrade pip
 pip install -r /workspace/VACE/requirements.txt || true
-pip install huggingface_hub einops omegaconf safetensors av transformers accelerate
+pip install huggingface_hub einops omegaconf safetensors av transformers accelerate torchsde
 
-# ⬇️ Download VACE model
-export VACE_MODEL_PATH="/workspace/models/checkpoints/Wan2.1-VACE-14B"
-mkdir -p "$VACE_MODEL_PATH"
-chmod -R 777 "$VACE_MODEL_PATH"
-
+# ⬇️ Download VACE model to wan/
 python3 - <<EOF
 import os
 from huggingface_hub import snapshot_download
@@ -65,19 +67,24 @@ snapshot_download(
 EOF
 
 # 🧾 List downloaded model files
-echo "📁 Contents of model directory:"
+echo "📁 Contents of wan/ directory:"
 ls -lh "$VACE_MODEL_PATH"
 
-# ✅ Flexible sanity check for model
-echo "🔍 Validating model presence..."
-if [ -z "$(ls -A $VACE_MODEL_PATH)" ]; then
-    echo "❌ ERROR: Model folder is empty!"
+# 🧩 Copy model to ComfyUI checkpoints if present
+echo "🔗 Copying model to ComfyUI checkpoint path..."
+cp "$VACE_MODEL_PATH"/*.safetensors "$VACE_CHECKPOINT_PATH" || true
+cp "$VACE_MODEL_PATH"/*.bin "$VACE_CHECKPOINT_PATH" || true
+
+# ✅ Sanity check for ComfyUI-compatible model
+echo "🔍 Validating copied model presence..."
+if [ -z "$(ls -A $VACE_CHECKPOINT_PATH)" ]; then
+    echo "❌ ERROR: No model found in $VACE_CHECKPOINT_PATH!"
     exit 1
 else
-    echo "✅ VACE model files detected."
+    echo "✅ Model successfully copied to ComfyUI checkpoints."
 fi
 
-# 🔁 Clone custom node pack if needed
+# 🔁 Install custom nodes
 echo "📦 Installing custom nodes..."
 mkdir -p /workspace/ComfyUI/custom_nodes
 cd /workspace/ComfyUI/custom_nodes
@@ -85,8 +92,8 @@ git clone https://github.com/ltdrdata/ComfyUI-Manager.git || true
 git clone https://github.com/ltdrdata/ComfyUI-Impact-Pack.git || true
 touch ComfyUI-Impact-Pack/__init__.py
 
-# ⬇️ Download example workflow JSON
-echo "⬇️ Fetching example workflow file..."
+# ⬇️ Download workflow from QuantStack
+echo "⬇️ Fetching QuantStack example workflow file..."
 wget -O "$COMFYUI_WORKFLOWS_PATH/vace_v2v_example_workflow.json" \
 https://huggingface.co/QuantStack/Wan2.1-VACE-14B-GGUF/resolve/main/vace_v2v_example_workflow.json
 
