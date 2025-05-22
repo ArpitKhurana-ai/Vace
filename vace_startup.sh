@@ -84,6 +84,13 @@ else
     echo "✅ Model successfully copied to ComfyUI checkpoints."
 fi
 
+# ⬇️ Download required wan_2.1_vae.safetensors file for the workflow
+echo "⬇️ Downloading VAE file for Wan2.1..."
+mkdir -p /workspace/models/vae
+wget -O /workspace/models/vae/wan_2.1_vae.safetensors \
+https://huggingface.co/Wan-AI/Wan2.1-VACE-14B/resolve/main/wan_2.1_vae.safetensors
+chmod 777 /workspace/models/vae/wan_2.1_vae.safetensors
+
 # 🔁 Install custom nodes
 echo "📦 Installing custom nodes..."
 mkdir -p /workspace/ComfyUI/custom_nodes
