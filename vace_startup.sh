@@ -7,10 +7,6 @@ exec > >(tee /app/startup.log) 2>&1
 
 echo "🟡 Starting ComfyUI + VACE Setup..."
 
-# 🌐 Dummy HTTP listener to keep RunPod alive
-nohup python3 -m http.server 8188 > /dev/null 2>&1 &
-sleep 2
-
 # 🕓 Timezone Setup
 apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -57,8 +53,6 @@ touch /workspace/VACE/vace/models/unit/README.txt
 # 📦 Python requirements
 pip install --upgrade pip
 pip install huggingface_hub einops omegaconf safetensors av transformers accelerate torchsde aiohttp
-
-# ✅ Optional: Install VACE requirements if not already present
 pip install -r /workspace/VACE/requirements.txt || true
 
 # ⬇️ Download VACE model to wan/
